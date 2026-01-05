@@ -18,10 +18,28 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	AnnasSearchEndpoint   = "https://annas-archive.org/search?q=%s"
-	AnnasDownloadEndpoint = "https://annas-archive.org/dyn/api/fast_download.json?md5=%s&key=%s"
-)
+// Default base URL - can be overridden via ANNAS_BASE_URL environment variable
+// Alternative mirrors: annas-archive.se, annas-archive.gs
+const defaultBaseURL = "https://annas-archive.org"
+
+// getBaseURL returns the base URL from environment or default
+func getBaseURL() string {
+	if baseURL := os.Getenv("ANNAS_BASE_URL"); baseURL != "" {
+		// Remove trailing slash if present
+		return strings.TrimSuffix(baseURL, "/")
+	}
+	return defaultBaseURL
+}
+
+// GetSearchEndpoint returns the search endpoint URL
+func GetSearchEndpoint() string {
+	return getBaseURL() + "/search?q=%s"
+}
+
+// GetDownloadEndpoint returns the download API endpoint URL
+func GetDownloadEndpoint() string {
+	return getBaseURL() + "/dyn/api/fast_download.json?md5=%s&key=%s"
+}
 
 func extractMetaInformation(meta string) (language, format, size string) {
 	// The meta format may be:
@@ -84,7 +102,7 @@ func FindBook(query string) ([]*Book, error) {
 		l.Info("Visiting URL", zap.String("url", r.URL.String()))
 	})
 
-	fullURL := fmt.Sprintf(AnnasSearchEndpoint, url.QueryEscape(query))
+	fullURL := fmt.Sprintf(GetSearchEndpoint(), url.QueryEscape(query))
 	c.Visit(fullURL)
 	c.Wait()
 
@@ -125,7 +143,7 @@ func FindBook(query string) ([]*Book, error) {
 }
 
 func (b *Book) Download(secretKey, folderPath string) error {
-	apiURL := fmt.Sprintf(AnnasDownloadEndpoint, b.Hash, secretKey)
+	apiURL := fmt.Sprintf(GetDownloadEndpoint(), b.Hash, secretKey)
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
